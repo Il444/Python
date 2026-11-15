@@ -36,3 +36,62 @@ class Instrument:
         if value not in ALLOWED_RANGES:
             raise ValueError("This range is not allowed!")
         self._measurement_range = float(value)
+
+    def _check_open(self):
+        if self._is_closed:
+            raise RuntimeError("Instrument is closed. Another use is prohibited!")
+
+    def measure_one(self) -> float:
+        self._check_open()
+        value = self._source.read_sample()
+        if abs(value) > self.measurement_range:
+            raise ValueError(f"Value {value} is not in {self.measurement_range}")
+        self._measurements.append(value)
+        return value
+
+    def measure_series(self, n: int) -> list[float]:
+        self._check_open()
+        if type(n) is not int or n <= 0:
+            raise ValueError("The amount of measurements must be positive, whole number")
+        return [self.measure_one() for _ in range(n)]
+
+    def status(self) -> dict:
+        return {
+            "channel": self._channel,
+            "is_closed": self._is_closed,
+            "sample_rate": f"{self._sample_rate} Hz",
+            "measurement_range": self.measurement_range,
+            "measurement_count": len(self._measurements),
+        }
+
+    def close(self):
+        self._is_closed = True
+
+    def __enter__(self):
+        self._check_open()
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
+
+    def __repr__(self) -> str:
+        state = "closed" if self._is_closed else "open"
+        return (
+            f"Instrument(channel='{self._channel}', range={self.measurement_range}, "
+            f"rate={self.sample_rate} Hz, samples={len(self._measurements)}, state='{state}'"
+        )
+
+    def __len__(self) -> int:
+        return len(self._measurements)
+
+    def save_to_file(self, file_path: str, signal_shape: str = "sine_with_noise"):
+        seed_val = getattr(self._source, "_seed", None)
+        with open(file_path, "w", encoding="utf-8") as f:
+            f.write(f"# sample_rate: {self.sample_rate} Hz\n")
+            f.write(f"# unit: {self._unit}\n")
+            f.write(f"# signal_shape: {signal_shape}\n")
+            if seed_val is not None:
+                f.write(f"# seed: {seed_val}\n")
+            for val in self._measurements:
+                f.write(f"{val}\n")

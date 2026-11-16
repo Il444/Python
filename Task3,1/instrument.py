@@ -86,7 +86,7 @@ class Instrument:
         return len(self._measurements)
 
     def save_to_file(self, file_path: str, signal_shape: str = "sine_with_noise"):
-        seed_val = getattr(self._source, "_seed", None)
+        seed_val = self._source._seed if isinstance(self._source, SignalSource) else None
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(f"# sample_rate: {self.sample_rate} Hz\n")
             f.write(f"# unit: {self._unit}\n")
